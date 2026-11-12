@@ -1,0 +1,14 @@
+{
+  "name": "coracao-rv",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Coração por Dentro: MVP WebXR de anatomia cardíaca",
+  "license": "MIT",
+  "scripts": {
+    "start": "node tools/serve.mjs site 8080",
+    "test": "node tests/smoke.mjs"
+  },
+  "devDependencies": {
+    "playwright-core": "1.49.1"
+  }
+}

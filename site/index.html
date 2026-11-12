@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Coração por Dentro</title>
+  <meta name="description" content="Experiência de realidade virtual (WebXR) para estudar a anatomia do coração: explore, entre nas câmaras e siga o trajeto do sangue.">
+  <meta name="theme-color" content="#101318">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%E2%9D%A4%EF%B8%8F%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/aframe@1.7.1/dist/aframe-v1.7.1.min.js"></script>
+  <script src="content.js"></script>
+  <script src="app.js"></script>
+</head>
+<body>
+  <a-scene id="scene" app-root
+           renderer="antialias: true; colorManagement: true; maxCanvasWidth: 2048; maxCanvasHeight: 2048"
+           xr-mode-ui="enabled: false" loading-screen="enabled: false"
+           device-orientation-permission-ui="enabled: true"
+           background="color: #14171c">
+    <a-assets timeout="120000">
+      <a-asset-item id="coracao" src="coracao.glb"></a-asset-item>
+    </a-assets>
+
+    <a-entity light="type: hemisphere; color: #ffffff; groundColor: #3a3f4a; intensity: 1.3"></a-entity>
+    <a-entity light="type: directional; color: #ffffff; intensity: 2.0" position="1 2.5 2"></a-entity>
+    <a-entity light="type: directional; color: #cfe0ff; intensity: 0.9" position="-2 1 -1.5"></a-entity>
+    <a-circle id="chao" radius="6" rotation="-90 0 0" material="color: #1b1f26; roughness: 1"></a-circle>
+
+    <a-entity id="rig">
+      <a-entity id="camera" camera="near: 0.05; fov: 70" position="0 1.6 0"
+                look-controls="mouseEnabled: false; touchEnabled: false; magicWindowTrackingEnabled: false"
+                wasd-controls="enabled: false"></a-entity>
+      <a-entity id="ctrlR" laser-controls="hand: right" raycaster="objects: #vrui; far: 8; interval: 50" controller-pick></a-entity>
+      <a-entity id="ctrlL" laser-controls="hand: left" raycaster="objects: #vrui; far: 8; interval: 50" controller-pick></a-entity>
+    </a-entity>
+
+    <a-entity id="pivot" position="0 1.5 -1.2">
+      <a-entity id="modelo" gltf-model="#coracao" scale="8 8 8"></a-entity>
+    </a-entity>
+
+    <a-entity id="vrui" vr-ui visible="false"></a-entity>
+  </a-scene>
+
+  <!-- ===================== Interface HTML (fora do VR) ===================== -->
+  <div id="ui">
+    <header class="topbar">
+      <button id="btnMenu" class="btn icon only-mobile" aria-controls="sidebar" aria-expanded="false">☰ Menu</button>
+      <h1 class="brand">Coração <span>por Dentro</span></h1>
+      <div class="topbar-actions">
+        <button id="btnVR" class="btn primary" hidden>👓 Entrar em VR</button>
+        <button id="btnAudio" class="btn" aria-pressed="true">🔊 Áudio ligado</button>
+        <button id="btnRecenter" class="btn">⏸ Pausar / Recentrar</button>
+        <button id="btnAbout" class="btn">Sobre</button>
+      </div>
+    </header>
+
+    <aside id="sidebar" class="sidebar" aria-label="Controles">
+      <button id="btnMenuClose" class="btn only-mobile menu-close">✕ Fechar menu</button>
+      <section>
+        <h2>Atividades</h2>
+        <div class="stack">
+          <button class="btn wide" data-action="path">🩸 Trajeto do sangue</button>
+          <button class="btn wide" data-action="enter-ad">🚪 Entrar no átrio direito</button>
+          <button class="btn wide" data-action="enter-ve">🚪 Entrar no ventrículo esquerdo</button>
+          <button class="btn wide" data-action="quiz">🎯 Desafio</button>
+        </div>
+      </section>
+
+      <section>
+        <h2>Camadas</h2>
+        <label class="switch"><input type="checkbox" id="tglWalls"> <span>Paredes transparentes</span></label>
+        <div id="layerToggles"></div>
+      </section>
+
+      <section>
+        <h2 id="scaleLabel">Escala</h2>
+        <div class="segmented" role="radiogroup" aria-labelledby="scaleLabel">
+          <button role="radio" aria-checked="false" data-scale="1">Real (1×)</button>
+          <button role="radio" aria-checked="true" data-scale="8">Ampliado (8×)</button>
+          <button role="radio" aria-checked="false" data-scale="20">Gigante (20×)</button>
+        </div>
+      </section>
+
+      <section id="listSection">
+        <h2 id="listLabel">Estruturas</h2>
+        <p class="hint">Use as setas ↑ ↓ para percorrer e Enter para selecionar.</p>
+        <ul id="structList" class="struct-list" aria-labelledby="listLabel"></ul>
+      </section>
+    </aside>
+
+    <section id="info" class="info" aria-live="polite" hidden>
+      <button class="close" id="infoClose" aria-label="Fechar painel">✕</button>
+      <h2 id="infoTitle"></h2>
+      <p id="infoText"></p>
+      <div class="row">
+        <button id="btnSpeak" class="btn">🔊 Ouvir</button>
+        <button id="btnLibras" class="btn">🤟 Libras</button>
+      </div>
+    </section>
+
+    <!-- Barra do trajeto do sangue -->
+    <section id="pathBar" class="modebar" hidden aria-live="polite">
+      <div class="modebar-text">
+        <strong id="pathStep"></strong>
+        <p id="pathText"></p>
+      </div>
+      <div class="row">
+        <button class="btn" id="pathPrev">◀ Anterior</button>
+        <button class="btn" id="pathRepeat">🔁 Repetir áudio</button>
+        <button class="btn primary" id="pathNext">Próximo ▶</button>
+        <button class="btn" id="pathExit">Sair</button>
+      </div>
+    </section>
+
+    <!-- Barra do modo "entrar" -->
+    <section id="enterBar" class="modebar" hidden aria-live="polite">
+      <div class="modebar-text">
+        <strong id="enterTitle"></strong>
+        <p id="enterText"></p>
+      </div>
+      <div class="row">
+        <button class="btn" id="enterSpeak">🔊 Ouvir</button>
+        <button class="btn primary big" id="enterExit">Sair do coração</button>
+      </div>
+    </section>
+
+    <!-- Barra do desafio -->
+    <section id="quizBar" class="modebar quiz" hidden aria-live="assertive">
+      <div class="modebar-text">
+        <strong id="quizCount"></strong>
+        <p id="quizQuestion" class="question"></p>
+        <p id="quizFeedback" class="feedback"></p>
+      </div>
+      <div class="row">
+        <button class="btn" id="quizSkip">Pular</button>
+        <button class="btn" id="quizExit">Encerrar</button>
+      </div>
+    </section>
+
+    <div id="toast" class="toast" role="status" hidden></div>
+  </div>
+
+  <!-- Tela inicial / carregamento -->
+  <div id="splash" class="overlay">
+    <div class="card">
+      <h1>Coração <span>por Dentro</span></h1>
+      <p>Explore um coração 3D real, entre nas câmaras e siga o caminho do sangue. Funciona no computador, no celular (com ou sem visor) e em headsets.</p>
+      <div class="progress" role="progressbar" aria-label="Carregando o modelo" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div id="progressFill"></div></div>
+      <p id="progressText" class="hint">Carregando o modelo…</p>
+      <div class="comfort">
+        <strong>Conforto:</strong> pode tirar o visor a qualquer momento. Se sentir enjoo, pare.
+      </div>
+      <button id="btnStart" class="btn primary big" disabled>Começar</button>
+    </div>
+  </div>
+
+  <!-- Modal genérico -->
+  <div id="modal" class="overlay" hidden>
+    <div class="card" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <button class="close" id="modalClose" aria-label="Fechar">✕</button>
+      <h2 id="modalTitle"></h2>
+      <div id="modalBody"></div>
+    </div>
+  </div>
+
+  <template id="tplAbout">
+    <p><strong>Coração por Dentro</strong> é um MVP de realidade virtual para o ensino de anatomia cardíaca, feito para a disciplina <em>Realidade Virtual para Transformação Social</em>.</p>
+    <h3>Créditos</h3>
+    <p>Modelo anatômico: <strong>BodyParts3D</strong>, © The Database Center for Life Science, licença
+      <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>.
+      Adaptado (recortado, agrupado e recolorido).
+      <a href="https://dbarchive.biosciencedbc.jp/en/bodyparts3d/" target="_blank" rel="noopener">Site do BodyParts3D</a>.</p>
+    <p>Conversão de dados: <a href="https://github.com/ashemag/human-atlas" target="_blank" rel="noopener">human-atlas</a> (MIT).</p>
+    <p>Motor 3D: <a href="https://aframe.io" target="_blank" rel="noopener">A-Frame</a> 1.7.1 (MIT). Código deste projeto: MIT.</p>
+    <h3>O que é simulado ou limitado</h3>
+    <ul>
+      <li>Modelo de um homem adulto de referência; corações reais variam.</li>
+      <li>Não há tecido pulmonar (parênquima) no modelo; a árvore brônquica é só referência.</li>
+      <li>As valvas são estáticas: não há batimento nem abertura e fechamento.</li>
+      <li>O vídeo em Libras é <strong>simulado</strong> neste MVP.</li>
+      <li>Uso educacional, não clínico. Textos sujeitos a revisão por docente de anatomia.</li>
+    </ul>
+    <h3>Atalhos de teclado</h3>
+    <ul>
+      <li><kbd>Tab</kbd> percorre os botões; <kbd>↑</kbd> <kbd>↓</kbd> trocam de estrutura; <kbd>Enter</kbd> seleciona.</li>
+      <li>No trajeto do sangue: <kbd>←</kbd> <kbd>→</kbd> mudam de passo. <kbd>Esc</kbd> sai do modo atual.</li>
+    </ul>
+  </template>
+</body>
+</html>
